@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高級日語會考｜互動刷題系統</title>
+<!-- 手機加入主畫面時顯示的圖示（同資料夾放 icon.png 即可） -->
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+
+<style>
+:root{
+  --ink:#242424;--muted:#686868;--line:#e4e1dc;--paper:#fffdfa;
+  --accent:#3a5f56;--soft:#edf4f0;--bad:#9a3939;--badbg:#fff2f0;
+  --good:#236747;--goodbg:#edf8f0;--expbg:#fcfaf5;--expborder:#e8dfcc;
+  --tag:#605746;--gold:#9d8147;--gold-light:#f7f4ec;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#f4f2ee;color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",serif;line-height:1.65}
+.wrap{max-width:860px;margin:0 auto;padding:20px 14px 60px}
+
+/* 日式典雅書本封面樣式 */
+.book-cover{
+  background: var(--paper);
+  border: 1px solid #d9d4c7;
+  border-radius: 18px;
+  padding: 40px 24px;
+  text-align: center;
+  margin-bottom: 25px;
+  box-shadow: 0 6px 20px rgba(40,35,25,0.06);
+  position: relative;
+  background-image: radial-gradient(#ece7dc 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.book-cover-inner{
+  border: 1px solid #d5cbba;
+  padding: 30px 18px;
+  border-radius: 12px;
+  outline: 2px solid rgba(213,203,186,0.35);
+  outline-offset: 4px;
+  background: rgba(255,253,250,0.92);
+}
+.cover-tag{
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  border-bottom: 1px solid var(--gold);
+  padding-bottom: 3px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.cover-title{
+  font-family: "Noto Serif TC", "Songti TC", "Source Han Serif", serif;
+  font-size: clamp(26px, 5.5vw, 36px);
+  letter-spacing: 0.08em;
+  margin: 10px 0;
+  color: #2b251d;
+  line-height: 1.35;
+}
+.cover-desc{
+  font-size: 14px;
+  color: #7a6f5d;
+  letter-spacing: 0.05em;
+  margin-top: 14px;
+}
+
+/* 作答控制面板與主體 */
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.panel,.card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:15px;box-shadow:0 3px 12px #25252508}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.controls label{font-size:14px;color:var(--muted)}
+select,button{font:inherit;border-radius:10px;padding:8px 13px;border:1px solid #c9c6bf;background:white;color:var(--ink)}
+button{cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:white;font-weight:650}
+button:disabled{opacity:.45;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.stat{background:#f6f5f1;border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px;line-height:1.3}
+.stat span{font-size:12px;color:var(--muted)}
+.bar{height:7px;background:#e9e7e1;border-radius:10px;overflow:hidden;margin-top:12px}
+.bar>div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.qmeta{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.tag-badge{background:#e7e2d7;color:var(--tag);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600}
+.question{font-size:19px;font-weight:650;white-space:pre-wrap;line-height:1.7;margin:15px 0}
+.options{display:grid;gap:9px}
+.option{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px;border:1px solid var(--line);background:white;border-radius:12px;line-height:1.5}
+.option .letter{flex:0 0 28px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#f1f0eb;font-weight:700;font-size:13px}
+.option.selected{border-color:var(--accent);background:var(--soft)}
+.option.correct{border-color:#8ab69a;background:var(--goodbg)}
+.option.wrong{border-color:#d7a2a0;background:var(--badbg)}
+.feedback{padding:13px 15px;border-radius:12px;margin-top:14px}
+.feedback.good{background:var(--goodbg);color:var(--good)}
+.feedback.bad{background:var(--badbg);color:var(--bad)}
+.exp-card{margin-top:10px;padding:11px 14px;background:var(--expbg);border:1px solid var(--expborder);border-radius:10px;color:#453a2a;font-size:14px;line-height:1.6}
+.exp-card strong{color:#2e2415}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.small{font-size:13px;color:var(--muted)}
+.review-list{display:grid;gap:8px}
+.review-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:10px 0}
+.review-row:last-child{border-bottom:0}
+.empty{padding:22px;text-align:center;color:var(--muted)}
+@media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}.panel,.card{padding:14px}.question{font-size:18px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <!-- 日式典雅封面卡片（文字依考卷自動對應） -->
+  <section class="book-cover">
+    <div class="book-cover-inner">
+      <div class="cover-tag" id="coverTag">高級日語學科能力評量・實戰練習</div>
+      <h1 class="cover-title" id="coverTitle">高級日語會考<br>互動刷題系統</h1>
+      <div class="cover-desc" id="coverDesc">全題目中文解析＆關鍵考點掌握・高分通關必備</div>
+    </div>
+  </section>
+
+  <header class="top">
+    <div>
+      <h2 style="margin:0;font-size:20px" id="examSubTitle">會考文法練習題庫</h2>
+      <p class="small" id="examInfo" style="margin-top:3px">載入中...</p>
+    </div>
+    <button id="resetAll">重設作答紀錄</button>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <label for="batch">本回合題數</label>
+      <select id="batch">
+        <option value="50">50 題</option>
+        <option value="100">100 題</option>
+        <option value="all">全部題庫</option>
+        <option value="wrong">只練錯題</option>
+        <option value="unseen">只練未作答題</option>
+      </select>
+      <label for="order">出題順序</label>
+      <select id="order">
+        <option value="seq">依題號</option>
+        <option value="random">隨機出題</option>
+      </select>
+      <button class="primary" id="start">開始本回合</button>
+      <button id="resume">繼續進度</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="sDone">0</b><span>已作答</span></div>
+      <div class="stat"><b id="sCorrect">0</b><span>答對數</span></div>
+      <div class="stat"><b id="sWrong">0</b><span>錯題數</span></div>
+      <div class="stat"><b id="sLeft">0</b><span>未作答</span></div>
+    </div>
+    <div class="bar"><div id="progress"></div></div>
+    <div class="small" id="progressText" style="margin-top:6px">尚未開始</div>
+  </section>
+
+  <section class="card" id="quiz">
+    <div class="empty">點擊「開始本回合」即可進行刷題練習。</div>
+  </section>
+
+  <section class="panel">
+    <div class="top">
+      <div>
+        <h2 style="margin:0;font-size:18px">錯題複習庫</h2>
+        <p class="small" style="margin:2px 0 0">答錯題目會保存在此，隨時可進行單題加強重練。</p>
+      </div>
+      <button id="clearWrong">清空錯題列表</button>
+    </div>
+    <div id="wrongList" class="review-list" style="margin-top:10px">
+      <div class="empty">目前沒有錯題紀錄。</div>
+    </div>
+  </section>
+</main>
+
+<script src="data.js"></script>
+
+<script>
+const LETTERS = ['A','B','C','D'];
+const STORAGE_KEY = (typeof CURRENT_EXAM_CONFIG !== 'undefined' && CURRENT_EXAM_CONFIG.id) 
+  ? 'quiz_' + CURRENT_EXAM_CONFIG.id 
+  : 'quiz_default_v1';
+
+let state = { answers:{}, wrong:[], run:[], idx:0, runActive:false };
+try {
+  const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  if(s && s.answers) state = { ...state, ...s };
+} catch(e){}
+
+const $ = id => document.getElementById(id);
+
+function initExamHeader() {
+  if (typeof CURRENT_EXAM_CONFIG !== 'undefined') {
+    if (CURRENT_EXAM_CONFIG.title) $('coverTitle').innerHTML = CURRENT_EXAM_CONFIG.title.replace('・', '<br>');
+    if (CURRENT_EXAM_CONFIG.subtitle) $('examSubTitle').textContent = CURRENT_EXAM_CONFIG.subtitle;
+    $('examInfo').textContent = `共 ${QUESTIONS.length} 題｜答錯即時呈現考點與中文解析`;
+  }
+}
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  updateStats();
+  renderWrong();
+}
+
+function updateStats() {
+  const total = QUESTIONS.length;
+  const done = Object.keys(state.answers).length;
+  const correct = Object.values(state.answers).filter(x => x.correct).length;
+  $('sDone').textContent = done;
+  $('sCorrect').textContent = correct;
+  $('sWrong').textContent = state.wrong.length;
+  $('sLeft').textContent = Math.max(0, total - done);
+  const pct = total ? Math.round(done / total * 100) : 0;
+  $('progress').style.width = pct + '%';
+  $('progressText').textContent = `整體進度：${done} / ${total}（${pct}%）`;
+}
+
+function makeRun() {
+  const mode = $('batch').value;
+  let pool = QUESTIONS.map(q => q.n);
+  if (mode === 'wrong') pool = pool.filter(n => state.wrong.includes(n));
+  if (mode === 'unseen') pool = pool.filter(n => !state.answers[n]);
+  if (mode !== 'all' && mode !== 'wrong' && mode !== 'unseen') {
+    pool = pool.slice(0, Number(mode));
+  }
+  if ($('order').value === 'random') pool.sort(() => Math.random() - 0.5);
+  state.run = pool;
+  state.idx = 0;
+  state.runActive = true;
+  save();
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const box = $('quiz');
+  if (!state.runActive) {
+    box.innerHTML = '<div class="empty">點擊「開始本回合」即可進行刷題練習。</div>';
+    return;
+  }
+  if (!state.run.length) {
+    box.innerHTML = '<div class="empty">目前設定範圍內無題目可練。</div>';
+    return;
+  }
+  if (state.idx >= state.run.length) {
+    box.innerHTML = `<div class="empty"><h2>🎉 本回合完成！</h2><p>共練習了 ${state.run.length} 題。</p><button class="primary" onclick="reviewWrongRun()">練習本回合錯題</button> <button onclick="makeRun()">再開新回合</button></div>`;
+    return;
+  }
+
+  const n = state.run[state.idx];
+  const q = QUESTIONS.find(item => item.n === n);
+  const a = state.answers[n];
+
+  box.innerHTML = `
+    <div class="qmeta">
+      <span>第 ${state.idx + 1} / ${state.run.length} 題（題號：#${n}）</span>
+    </div>
+    <div class="question"></div>
+    <div class="options"></div>
+  `;
+
+  box.querySelector('.question').textContent = q.prompt;
+  const opts = box.querySelector('.options');
+
+  q.choices.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option';
+    btn.innerHTML = `<span class="letter">${LETTERS[i]}</span><span></span>`;
+    btn.querySelector('span:nth-child(2)').textContent = c;
+
+    if (a) {
+      if (LETTERS[i] === q.answer) btn.classList.add('correct');
+      if (a.choice === LETTERS[i] && a.choice !== q.answer) btn.classList.add('wrong');
+      if (a.choice === LETTERS[i]) btn.classList.add('selected');
+      btn.disabled = true;
+    } else {
+      btn.onclick = () => choose(n, LETTERS[i]);
+    }
+    opts.appendChild(btn);
+  });
+
+  if (a) {
+    const fb = document.createElement('div');
+    fb.className = 'feedback ' + (a.correct ? 'good' : 'bad');
+    if (a.correct) {
+      fb.innerHTML = `<div><strong>答對了！</strong> 正確答案是 <strong>${q.answer}</strong>。</div>`;
+    } else {
+      let tagInfo = q.tag ? `<div style="margin-bottom: 6px;"><span class="tag-badge">考點句型：${q.tag}</span></div>` : '';
+      fb.innerHTML = `
+        <div><strong>答錯了。</strong> 你的選擇：<strong>${a.choice}</strong>，正確答案：<strong>${q.answer}</strong>。</div>
+        <div class="exp-card">
+          ${tagInfo}
+          <strong>【解析】</strong>${q.explanation || '暫無解析'}
+        </div>
+      `;
+    }
+    box.appendChild(fb);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+
+  if (a) {
+    const retry = document.createElement('button');
+    retry.textContent = '重做此題';
+    retry.onclick = () => { delete state.answers[n]; save(); renderQuestion(); };
+    actions.appendChild(retry);
+  }
+
+  const prev = document.createElement('button');
+  prev.textContent = '上一題';
+  prev.disabled = state.idx === 0;
+  prev.onclick = () => { state.idx--; save(); renderQuestion(); };
+  actions.appendChild(prev);
+
+  const next = document.createElement('button');
+  next.className = 'primary';
+  next.textContent = state.idx === state.run.length - 1 ? '完成本回合' : '下一題';
+  next.onclick = () => { state.idx++; save(); renderQuestion(); };
+  actions.appendChild(next);
+
+  box.appendChild(actions);
+}
+
+function choose(n, choice) {
+  const q = QUESTIONS.find(item => item.n === n);
+  const correct = choice === q.answer;
+  state.answers[n] = { choice, correct };
+  if (!correct && !state.wrong.includes(n)) state.wrong.push(n);
+  save();
+  renderQuestion();
+}
+
+function renderWrong() {
+  const box = $('wrongList');
+  if (!state.wrong.length) {
+    box.innerHTML = '<div class="empty">目前沒有錯題紀錄。</div>';
+    return;
+  }
+  box.innerHTML = '';
+  state.wrong.slice().sort((a,b)=>a-b).forEach(n => {
+    const q = QUESTIONS.find(item => item.n === n);
+    if (!q) return;
+    const row = document.createElement('div');
+    row.className = 'review-row';
+    row.innerHTML = `
+      <div>
+        <b>第 ${n} 題</b>
+        <div class="small">${q.prompt}</div>
+      </div>
+      <button>單題加強</button>
+    `;
+    row.querySelector('button').onclick = () => {
+      state.run = [n];
+      state.idx = 0;
+      state.runActive = true;
+      delete state.answers[n];
+      save();
+      renderQuestion();
+      window.scrollTo({ top: $('quiz').offsetTop - 15, behavior: 'smooth' });
+    };
+    box.appendChild(row);
+  });
+}
+
+function reviewWrongRun() {
+  let pool = state.run.filter(n => state.wrong.includes(n));
+  if (!pool.length) pool = state.wrong.slice();
+  state.run = pool;
+  state.idx = 0;
+  state.runActive = true;
+  renderQuestion();
+}
+
+$('start').onclick = makeRun;
+$('resume').onclick = () => {
+  if (state.run && state.run.length) {
+    state.runActive = true;
+    renderQuestion();
+  } else {
+    makeRun();
+  }
+};
+$('clearWrong').onclick = () => {
+  if (confirm('確定要清空錯題複習清單？（不會刪除作答紀錄）')) {
+    state.wrong = [];
+    save();
+  }
+};
+$('resetAll').onclick = () => {
+  if (confirm('確定要重設所有作答進度與錯題紀錄？此操作無法還原。')) {
+    state = { answers:{}, wrong:[], run:[], idx:0, runActive:false };
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+    updateStats();
+    renderWrong();
+    renderQuestion();
+  }
+};
+
+initExamHeader();
+updateStats();
+renderWrong();
+if (state.runActive && state.run.length) renderQuestion();
+</script>
+</body>
+</html>
