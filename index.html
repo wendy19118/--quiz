@@ -105,7 +105,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </head>
 <body>
 <main class="wrap">
-  <!-- 日式典雅封面卡片（文字依考卷自動對應） -->
+  <!-- 日式典雅封面卡片 -->
   <section class="book-cover">
     <div class="book-cover-inner">
       <div class="cover-tag" id="coverTag">高級日語學科能力評量・實戰練習</div>
@@ -124,22 +124,47 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
   <section class="panel">
     <div class="controls">
+      <label for="scope">練習範圍</label>
+      <select id="scope">
+        <option value="unseen" selected>接續未作答（推薦）</option>
+        <option value="all">全部題庫</option>
+        <option value="wrong">只練錯題庫</option>
+        <optgroup label="指定 50 題區間">
+          <option value="range_1_50">第 1 ～ 50 題</option>
+          <option value="range_51_100">第 51 ～ 100 題</option>
+          <option value="range_101_150">第 101 ～ 150 題</option>
+          <option value="range_151_200">第 151 ～ 200 題</option>
+          <option value="range_201_250">第 201 ～ 250 題</option>
+          <option value="range_251_300">第 251 ～ 300 題</option>
+          <option value="range_301_350">第 301 ～ 350 題</option>
+          <option value="range_351_400">第 351 ～ 400 題</option>
+          <option value="range_401_end">第 401 題至最後</option>
+        </optgroup>
+        <optgroup label="指定 100 題區間">
+          <option value="range_1_100">第 1 ～ 100 題</option>
+          <option value="range_101_200">第 101 ～ 200 題</option>
+          <option value="range_201_300">第 201 ～ 300 題</option>
+          <option value="range_301_400">第 301 ～ 400 題</option>
+        </optgroup>
+      </select>
+
       <label for="batch">本回合題數</label>
       <select id="batch">
         <option value="50">50 題</option>
         <option value="100">100 題</option>
-        <option value="all">全部題庫</option>
-        <option value="wrong">只練錯題</option>
-        <option value="unseen">只練未作答題</option>
+        <option value="all">範圍內全部</option>
       </select>
+
       <label for="order">出題順序</label>
       <select id="order">
         <option value="seq">依題號</option>
         <option value="random">隨機出題</option>
       </select>
+
       <button class="primary" id="start">開始本回合</button>
       <button id="resume">繼續進度</button>
     </div>
+
     <div class="stats">
       <div class="stat"><b id="sDone">0</b><span>已作答</span></div>
       <div class="stat"><b id="sCorrect">0</b><span>答對數</span></div>
@@ -188,7 +213,7 @@ function initExamHeader() {
   if (typeof CURRENT_EXAM_CONFIG !== 'undefined') {
     if (CURRENT_EXAM_CONFIG.title) $('coverTitle').innerHTML = CURRENT_EXAM_CONFIG.title.replace('・', '<br>');
     if (CURRENT_EXAM_CONFIG.subtitle) $('examSubTitle').textContent = CURRENT_EXAM_CONFIG.subtitle;
-    $('examInfo').textContent = `共 ${QUESTIONS.length} 題｜答錯即時呈現考點與中文解析`;
+    $('examInfo').textContent = `共 ${QUESTIONS.length} 題｜作答即時呈現考點與中文解析`;
   }
 }
 
@@ -212,20 +237,84 @@ function updateStats() {
 }
 
 function makeRun() {
-  const mode = $('batch').value;
-  let pool = QUESTIONS.map(q => q.n);
-  if (mode === 'wrong') pool = pool.filter(n => state.wrong.includes(n));
-  if (mode === 'unseen') pool = pool.filter(n => !state.answers[n]);
-  if (mode !== 'all' && mode !== 'wrong' && mode !== 'unseen') {
-    pool = pool.slice(0, Number(mode));
+  const scope = $('scope').value;
+  const batchVal = $('batch').value;
+  const order = $('order').value;
+
+  let pool = [];
+
+  if (scope === 'wrong') {
+    pool = [...state.wrong];
+  } else if (scope === 'unseen') {
+    // 從未作答的題目中抽取
+    pool = QUESTIONS.filter(q => !state.answers[q.n]).map(q => q.n);
+  } else if (scope.startsWith('range_')) {
+    // 依指定題號區間抽取
+    const parts = scope.split('_');
+    const start = parseInt(parts[1], 10);
+    const end = parts[2] === 'end' ? 99999 : parseInt(parts[2], 10);
+    pool = QUESTIONS.filter(q => q.n >= start && q.n <= end).map(q => q.n);
+  } else {
+    // 全部題庫
+    pool = QUESTIONS.map(q => q.n);
   }
-  if ($('order').value === 'random') pool.sort(() => Math.random() - 0.5);
+
+  if (!pool.length) {
+    if (scope === 'wrong') {
+      alert('目前沒有錯題紀錄！');
+    } else if (scope === 'unseen') {
+      alert('太棒了！所有題目都已全部作答完成！🎉');
+    } else {
+      alert('所選範圍內沒有題目。');
+    }
+    return;
+  }
+
+  if (order === 'random') {
+    pool.sort(() => Math.random() - 0.5);
+  } else {
+    pool.sort((a, b) => a - b);
+  }
+
+  if (batchVal !== 'all') {
+    const count = parseInt(batchVal, 10);
+    pool = pool.slice(0, count);
+  }
+
   state.run = pool;
   state.idx = 0;
   state.runActive = true;
   save();
   renderQuestion();
 }
+
+function resumeProgress() {
+  // 1. 如果現有回合有題目，先檢查是否還有沒作答的
+  if (state.run && state.run.length > 0) {
+    let nextUnanswered = state.run.findIndex((n, idx) => idx >= state.idx && !state.answers[n]);
+    if (nextUnanswered === -1) {
+      nextUnanswered = state.run.findIndex(n => !state.answers[n]);
+    }
+
+    if (nextUnanswered !== -1) {
+      state.idx = nextUnanswered;
+      state.runActive = true;
+      save();
+      renderQuestion();
+      return;
+    }
+  }
+
+  // 2. 如果當前回合已全部完成（或單題加強已完成），自動接續下一批未作答題目
+  $('scope').value = 'unseen';
+  makeRun();
+}
+
+function nextBatch() {
+  $('scope').value = 'unseen';
+  makeRun();
+}
+window.nextBatch = nextBatch;
 
 function renderQuestion() {
   const box = $('quiz');
@@ -238,7 +327,18 @@ function renderQuestion() {
     return;
   }
   if (state.idx >= state.run.length) {
-    box.innerHTML = `<div class="empty"><h2>🎉 本回合完成！</h2><p>共練習了 ${state.run.length} 題。</p><button class="primary" onclick="reviewWrongRun()">練習本回合錯題</button> <button onclick="makeRun()">再開新回合</button></div>`;
+    const leftCount = QUESTIONS.filter(q => !state.answers[q.n]).length;
+    box.innerHTML = `
+      <div class="empty">
+        <h2>🎉 本回合完成！</h2>
+        <p>共練習了 ${state.run.length} 題。目前整體尚有 <strong>${leftCount}</strong> 題未作答。</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;">
+          ${leftCount > 0 ? '<button class="primary" onclick="nextBatch()">接續下一批練習</button>' : ''}
+          <button onclick="reviewWrongRun()">練習本回合錯題</button>
+          <button onclick="makeRun()">依設定再開一輪</button>
+        </div>
+      </div>
+    `;
     return;
   }
 
@@ -274,19 +374,28 @@ function renderQuestion() {
     opts.appendChild(btn);
   });
 
+  // 不論答對或答錯，均呈現考點句型與中文解析
   if (a) {
     const fb = document.createElement('div');
     fb.className = 'feedback ' + (a.correct ? 'good' : 'bad');
+    
+    let tagInfo = q.tag ? `<div style="margin-bottom: 6px;"><span class="tag-badge">考點句型：${q.tag}</span></div>` : '';
+    const expCardHtml = `
+      <div class="exp-card">
+        ${tagInfo}
+        <strong>【解析】</strong>${q.explanation || '暫無解析'}
+      </div>
+    `;
+
     if (a.correct) {
-      fb.innerHTML = `<div><strong>答對了！</strong> 正確答案是 <strong>${q.answer}</strong>。</div>`;
+      fb.innerHTML = `
+        <div><strong>答對了！</strong> 正確答案是 <strong>${q.answer}</strong>。</div>
+        ${expCardHtml}
+      `;
     } else {
-      let tagInfo = q.tag ? `<div style="margin-bottom: 6px;"><span class="tag-badge">考點句型：${q.tag}</span></div>` : '';
       fb.innerHTML = `
         <div><strong>答錯了。</strong> 你的選擇：<strong>${a.choice}</strong>，正確答案：<strong>${q.answer}</strong>。</div>
-        <div class="exp-card">
-          ${tagInfo}
-          <strong>【解析】</strong>${q.explanation || '暫無解析'}
-        </div>
+        ${expCardHtml}
       `;
     }
     box.appendChild(fb);
@@ -368,20 +477,15 @@ function reviewWrongRun() {
 }
 
 $('start').onclick = makeRun;
-$('resume').onclick = () => {
-  if (state.run && state.run.length) {
-    state.runActive = true;
-    renderQuestion();
-  } else {
-    makeRun();
-  }
-};
+$('resume').onclick = resumeProgress;
+
 $('clearWrong').onclick = () => {
   if (confirm('確定要清空錯題複習清單？（不會刪除作答紀錄）')) {
     state.wrong = [];
     save();
   }
 };
+
 $('resetAll').onclick = () => {
   if (confirm('確定要重設所有作答進度與錯題紀錄？此操作無法還原。')) {
     state = { answers:{}, wrong:[], run:[], idx:0, runActive:false };
