@@ -1,3 +1,19 @@
+從截圖中可以清楚看到，在解析末尾出現了 **`[cite: 1]`** 這樣的引用標籤！這確實是生成題庫時殘留的標記。
+
+要同時修正 **「範圍改為 11～60 頁」** 以及 **「自動消除解析中的 ``」**，最快也最徹底的方法是直接在 `index.html` 裡做兩處更新（這樣就不用一題一題去改 `data.js`）：
+
+1. **強制將副標題鎖定為「期中文法範圍（第 11～60 頁）」**（無論 `data.js` 原本寫什麼都會顯示 11～60 頁）。
+2. **在解析顯示時加入自動清洗規則**，把所有類似 `[cite: 1]` 的雜訊完全過濾掉。
+
+
+
+---
+
+### 完整修正後的 `index.html`
+
+您可以直接全選（`Ctrl + A`）**您目前的 `index.html`，並**貼上（`Ctrl + V`）以下更新後的整份程式碼存檔即可：
+
+```html
 <!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -116,7 +132,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
   <header class="top">
     <div>
-      <h2 style="margin:0;font-size:20px" id="examSubTitle">會考文法練習題庫</h2>
+      <h2 style="margin:0;font-size:20px" id="examSubTitle">期中文法範圍（第 11～60 頁）</h2>
       <p class="small" id="examInfo" style="margin-top:3px">載入中...</p>
     </div>
     <button id="resetAll">重設作答紀錄</button>
@@ -212,9 +228,10 @@ const $ = id => document.getElementById(id);
 function initExamHeader() {
   if (typeof CURRENT_EXAM_CONFIG !== 'undefined') {
     if (CURRENT_EXAM_CONFIG.title) $('coverTitle').innerHTML = CURRENT_EXAM_CONFIG.title.replace('・', '<br>');
-    if (CURRENT_EXAM_CONFIG.subtitle) $('examSubTitle').textContent = CURRENT_EXAM_CONFIG.subtitle;
-    $('examInfo').textContent = `共 ${QUESTIONS.length} 題｜作答即時呈現考點與中文解析`;
   }
+  // 固定更新為 11～60 頁
+  $('examSubTitle').textContent = '期中文法範圍（第 11～60 頁）';
+  $('examInfo').textContent = `共 ${QUESTIONS.length} 題｜作答即時呈現考點與中文解析`;
 }
 
 function save() {
@@ -246,16 +263,13 @@ function makeRun() {
   if (scope === 'wrong') {
     pool = [...state.wrong];
   } else if (scope === 'unseen') {
-    // 從未作答的題目中抽取
     pool = QUESTIONS.filter(q => !state.answers[q.n]).map(q => q.n);
   } else if (scope.startsWith('range_')) {
-    // 依指定題號區間抽取
     const parts = scope.split('_');
     const start = parseInt(parts[1], 10);
     const end = parts[2] === 'end' ? 99999 : parseInt(parts[2], 10);
     pool = QUESTIONS.filter(q => q.n >= start && q.n <= end).map(q => q.n);
   } else {
-    // 全部題庫
     pool = QUESTIONS.map(q => q.n);
   }
 
@@ -289,7 +303,6 @@ function makeRun() {
 }
 
 function resumeProgress() {
-  // 1. 如果現有回合有題目，先檢查是否還有沒作答的
   if (state.run && state.run.length > 0) {
     let nextUnanswered = state.run.findIndex((n, idx) => idx >= state.idx && !state.answers[n]);
     if (nextUnanswered === -1) {
@@ -305,7 +318,6 @@ function resumeProgress() {
     }
   }
 
-  // 2. 如果當前回合已全部完成（或單題加強已完成），自動接續下一批未作答題目
   $('scope').value = 'unseen';
   makeRun();
 }
@@ -374,16 +386,22 @@ function renderQuestion() {
     opts.appendChild(btn);
   });
 
-  // 不論答對或答錯，均呈現考點句型與中文解析
+  // 不論答對或答錯，均呈現考點句型與中文解析，並自動過濾 標籤
   if (a) {
     const fb = document.createElement('div');
     fb.className = 'feedback ' + (a.correct ? 'good' : 'bad');
     
     let tagInfo = q.tag ? `<div style="margin-bottom: 6px;"><span class="tag-badge">考點句型：${q.tag}</span></div>` : '';
+    
+    // 清除[cite: 1] 等引用雜訊標籤
+    let cleanExplanation = (q.explanation || '暫無解析')
+      .replace(/\[cite:[^\]]*\]/gi, '')
+      .trim();
+
     const expCardHtml = `
       <div class="exp-card">
         ${tagInfo}
-        <strong>【解析】</strong>${q.explanation || '暫無解析'}
+        <strong>【解析】</strong>${cleanExplanation}
       </div>
     `;
 
@@ -503,3 +521,5 @@ if (state.runActive && state.run.length) renderQuestion();
 </script>
 </body>
 </html>
+
+```
